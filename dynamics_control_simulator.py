@@ -1,3 +1,8 @@
+#!/usr/bin/env python3
+
+# This code is an arrangement of casadi_mpc_nyuumon:
+# https://github.com/proxima-technology/casadi_mpc_nyuumon.git
+
 import numpy as np
 import matplotlib.pyplot as plt
 import casadi
