@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from dynamics_control_simulator import *
+from models import *
 import multiprocessing as mp
 from tqdm import tqdm
 import os
@@ -111,8 +112,8 @@ def random_trial():
 def single_test():
   dms = Damped_Mass_Spring_Model_MPC_Simulator(1.0, 1.0, 0.5)
   dms.ctrl.set_horizon(50, 0.5)
-  dms.ctrl.set_constraint(np.array([-0.01, -0.01]), np.array([10.01, 10.01]), np.array([0.0]), np.array([10.0]))
-  dms.ctrl.set_cost(np.diag([5098.0, 0.0]), np.diag([0.0]), np.diag([1.0, 1.0]))
+  dms.ctrl.set_constraint(np.array([-0.01, -0.01]), np.array([10.01, 10.01]), np.array([-10.0]), np.array([10.0]))
+  dms.ctrl.set_cost(np.diag([5000, 0.0]), np.diag([0.0]), np.diag([10.0, 10.0]))
   dms.set_aim([0, 0], [10, 0], [10])
   dms.ctrl.set_solver()
   dms.execute_until_stationary()

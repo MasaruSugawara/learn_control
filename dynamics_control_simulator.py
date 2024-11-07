@@ -13,30 +13,6 @@ class Dynamics_Model:
     self.nx = nx
     self.nu = nu
 
-class Damped_Mass_Spring_Model(Dynamics_Model):
-  def __init__(self, m = 1, k = 1, c = 0.5):
-    super().__init__(2, 1)
-    self.m = m
-    self.k = k
-    self.c = c
-    self.f = self.make_f(m, k, c)
-
-  def make_f(self, m, k, c):
-    states = casadi.SX.sym("states", self.nx)
-    ctrls = casadi.SX.sym("ctrls", self.nu)
-
-    A = casadi.DM([
-        [0,1],
-        [-k/m,-c/m]
-    ])
-    B = casadi.DM([
-        [0],
-        [1/m]
-    ])
-    states_dot = A @ states + B @ ctrls
-    f = casadi.Function("f",[states,ctrls],[states_dot],['x','u'],['x_dot'])
-    return f
-
 class System:
   def __init__(self, model):
     self.model = model
@@ -105,18 +81,22 @@ class PID_Controller(Controller):
     self.Kd = Kd
     self.error_sum = 0
     self.last_error = 0
+    self.f_err = lambda x, x_ref: x_ref[0] - x[0]
 
   def reset(self):
     self.error_sum = 0
-    self.last_error = self.sys.x_ref[0] - self.sys.x[0]
+    self.last_error = self.f_err(self.sys.x, self.sys.x_ref)
   
   def set_param(self, Kp, Ki, Kd):
     self.Kp = Kp
     self.Ki = Ki
     self.Kd = Kd
 
+  def set_error_func(self, f_err):
+    self.f_err = f_err
+
   def ctrl_out(self, dt):
-    error = self.sys.x_ref[0] - self.sys.x[0]
+    error = self.f_err(self.sys.x, self.sys.x_ref)
     self.error_sum += error * dt
     u = self.Kp * error + self.Ki * self.error_sum + self.Kd * (error - self.last_error) / dt
     self.last_error = error
@@ -175,8 +155,20 @@ class MPC_Controller(Controller):
     x_diff = x - self.sys.x_ref
     cost = casadi.dot(self.Q_f @ x_diff, x_diff) / 2
     return cost
-
-  def set_solver(self):
+  
+  def make_qp(self, X, U, J, G):
+    qp = {"x":casadi.vertcat(*X,*U),"f":J,"g":casadi.vertcat(*G)}
+    self.S = casadi.qpsol("S","osqp",qp, {
+      'error_on_fail': False,
+      'osqp': {'verbose': True}
+      })
+    
+  def make_nlp(self, X, U, J, G):
+    option = {'print_time':False,'ipopt':{'max_iter':10,'print_level':0}}
+    nlp = {"x":casadi.vertcat(*X,*U),"f":J,"g":casadi.vertcat(*G)}
+    self.S = casadi.nlpsol("S","ipopt",nlp,option)
+    
+  def set_solver(self, is_qp = False):
     RK4 = self.make_RK4()
     X = [casadi.SX.sym(f"x_{k}", self.sys.nx) for k in range(self.K+1)]
     U = [casadi.SX.sym(f"u_{k}", self.sys.nu) for k in range(self.K)]
@@ -189,10 +181,10 @@ class MPC_Controller(Controller):
         G.append(eq)
     J += self.compute_terminal_cost(X[-1])
 
-    qp = {"x":casadi.vertcat(*X,*U),"f":J,"g":casadi.vertcat(*G)}
-    self.S = casadi.qpsol("S","osqp",qp, {
-      'osqp': {'verbose': False}
-      })
+    if is_qp:
+      self.make_qp(X, U, J, G)
+    else:
+      self.make_nlp(X, U, J, G)    
     self.x0 = casadi.DM.zeros(self.sys.nx*(self.K+1)+self.sys.nu*self.K)
 
   def compute_optimal_control(self, S):
@@ -243,6 +235,7 @@ class Simulator:
     attained_time = 0
     is_attained = False
     self.time = [0]
+    self.dt = dt
     self.history_x = [self.sys.x]
     self.history_u = []
     self.history_attained = [0.0]
@@ -256,7 +249,7 @@ class Simulator:
       self.time.append(t)
       self.history_x.append(self.sys.x)
       self.history_u.append(u)
-      if abs(self.sys.x[0] - self.sys.x_ref[0]) < threshold:
+      if casadi.norm_2(self.sys.x - self.sys.x_ref) < threshold:
         self.history_attained.append(1.0)
         if is_attained:
           if t - attained_time >= exam_period:

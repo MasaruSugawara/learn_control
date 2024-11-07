@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from dynamics_control_simulator import *
+from models import *
 import multiprocessing as mp
 from tqdm import tqdm
 
