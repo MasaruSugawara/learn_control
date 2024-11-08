@@ -51,7 +51,7 @@ class Controller:
 class Const_Controller(Controller):
   def __init__(self, sys):
     super().__init__(sys)
-    self.gain = np.zeros(self.sys.nu)
+    self.gain = casadi.DM.zeros(self.sys.nu)
 
   def set_gain(self, gain):
     self.gain = casadi.DM(gain)
@@ -129,6 +129,15 @@ class MPC_Controller(Controller):
     self.u_lb = u_lb
     self.u_ub = u_ub
 
+  def make_euler(self):
+    states = casadi.SX.sym("states", self.sys.nx)
+    ctrls = casadi.SX.sym("ctrls", self.sys.nu)
+    f = self.sys.f
+    dt = self.dt
+    states_next = states + dt*f(x=states, u=ctrls)["x_dot"]
+    Euler = casadi.Function("Euler",[states,ctrls],[states_next],["x","u"],["x_next"])
+    return Euler
+
   def make_RK4(self):
     states = casadi.SX.sym("states", self.sys.nx)
     ctrls = casadi.SX.sym("ctrls", self.sys.nu)
@@ -168,8 +177,12 @@ class MPC_Controller(Controller):
     nlp = {"x":casadi.vertcat(*X,*U),"f":J,"g":casadi.vertcat(*G)}
     self.S = casadi.nlpsol("S","ipopt",nlp,option)
     
-  def set_solver(self, is_qp = False):
-    RK4 = self.make_RK4()
+  def set_solver(self, is_euler = False, is_qp = False):
+    if is_euler:
+      update_func = self.make_euler()
+    else:
+      update_func = self.make_RK4()
+
     X = [casadi.SX.sym(f"x_{k}", self.sys.nx) for k in range(self.K+1)]
     U = [casadi.SX.sym(f"u_{k}", self.sys.nu) for k in range(self.K)]
     G = []
@@ -177,7 +190,7 @@ class MPC_Controller(Controller):
     J = 0
     for k in range(self.K):
         J += self.compute_stage_cost(X[k], U[k]) * self.dt
-        eq = X[k+1] - RK4(x=X[k],u=U[k])["x_next"]
+        eq = X[k+1] - update_func(x=X[k],u=U[k])["x_next"]
         G.append(eq)
     J += self.compute_terminal_cost(X[-1])
 
