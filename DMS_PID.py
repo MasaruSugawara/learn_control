@@ -98,5 +98,5 @@ def single_test():
     dms.execute_until_stationary(10, 0.01, max_u=10.0)
     dms.plot_result()
 
-single_test()
-
+if __name__ == '__main__':
+   single_test()

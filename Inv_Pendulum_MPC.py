@@ -118,4 +118,5 @@ def single_test():
   dms.plot_result()
   dms.animation()
 
-single_test()
+if __name__ == '__main__':
+   single_test()
