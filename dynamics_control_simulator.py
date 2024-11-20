@@ -112,6 +112,8 @@ class MPC_Controller(Controller):
     self.x_ub = np.array([np.inf]*sys.nx)
     self.u_lb = np.array([-np.inf]*sys.nu)
     self.u_ub = np.array([np.inf]*sys.nu)
+    self.record_opt_history = False
+    self.opt_history = []
 
   def set_horizon(self, horizon_len, period):
     self.K = horizon_len
@@ -214,9 +216,21 @@ class MPC_Controller(Controller):
     self.x0 = res["x"]
     u_opt = self.x0[offset:offset+self.sys.nu]
     return u_opt
+  
+  def reshape_opt(self):
+    lenx = (self.K + 1) * self.sys.nx
+    x_opt = self.x0[:lenx].reshape((self.sys.nx, self.K + 1))
+    u_opt = self.x0[lenx:].reshape((self.sys.nu, self.K))
+    return [x_opt, u_opt]
+
+  def set_record(self, toggle = True):
+    self.record_opt_history = toggle
 
   def ctrl_out(self, dt):
     u_opt = self.compute_optimal_control(self.S)
+    if self.record_opt_history:
+      self.opt_history.append(self.reshape_opt())
+
     return u_opt
   
   def reset(self):
