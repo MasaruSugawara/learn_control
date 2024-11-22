@@ -95,6 +95,8 @@ class PID_Controller(Controller):
       self.last_state = d
     return u
 
+# MPC requires system's equation and complete (estimated) information of state vector
+# i.e. no == nx
 class MPC_Controller(Controller):
   def __init__(self, no: int, nu:int, param: dict = {}):
     super().__init__(no, nu, param, observer_queue_max = 1)
@@ -105,39 +107,45 @@ class MPC_Controller(Controller):
     self.param.setdefault('x_ub', np.array([np.inf]*no))
     self.param.setdefault('u_lb', np.array([-np.inf]*nu))
     self.param.setdefault('u_ub', np.array([np.inf]*nu))
+    self.param.setdefault('K', 10)
+    self.param.setdefault('T', 1.0)
+    self.param.setdefault('dt', 0.1)
     self.record_opt_history = False
     self.opt_history = []
 
+  def set_model(self, f: casadi.Function):
+    self.f = f
+
   def set_horizon(self, horizon_len, period):
-    self.K = horizon_len
-    self.T = period
-    self.dt = period / horizon_len
+    self.param['K'] = horizon_len
+    self.param['T'] = period
+    self.param['dt'] = period / horizon_len
 
   def set_cost(self, Q, R, Q_f):
-    self.Q = Q
-    self.R = R
-    self.Q_f = Q_f
+    self.param['Q'] = Q
+    self.param['R'] = R
+    self.param['Q_f'] = Q_f
 
   def set_constraint(self, x_lb, x_ub, u_lb, u_ub):
-    self.x_lb = x_lb
-    self.x_ub = x_ub
-    self.u_lb = u_lb
-    self.u_ub = u_ub
+    self.param['x_lb'] = x_lb
+    self.param['x_ub'] = x_ub
+    self.param['u_lb'] = u_lb
+    self.param['u_ub'] = u_ub
 
   def make_euler(self):
-    states = casadi.SX.sym("states", self.sys.nx)
-    ctrls = casadi.SX.sym("ctrls", self.sys.nu)
-    f = self.sys.f
-    dt = self.dt
+    states = casadi.SX.sym("states", self.no)
+    ctrls = casadi.SX.sym("ctrls", self.nu)
+    f = self.f
+    dt = self.param['dt']
     states_next = states + dt*f(x=states, u=ctrls)["x_dot"]
     Euler = casadi.Function("Euler",[states,ctrls],[states_next],["x","u"],["x_next"])
     return Euler
 
   def make_RK4(self):
-    states = casadi.SX.sym("states", self.sys.nx)
-    ctrls = casadi.SX.sym("ctrls", self.sys.nu)
-    f = self.sys.f
-    dt = self.dt
+    states = casadi.SX.sym("states", self.no)
+    ctrls = casadi.SX.sym("ctrls", self.nu)
+    f = self.f
+    dt = self.param['dt']
 
     r1 = f(x=states,u=ctrls)["x_dot"]
     r2 = f(x=states+dt*r1/2,u=ctrls)["x_dot"]
@@ -150,14 +158,14 @@ class MPC_Controller(Controller):
     return RK4
 
   def compute_stage_cost(self, x, u):
-    x_diff = x - self.sys.x_ref
-    u_diff = u - self.sys.u_ref
-    cost = (casadi.dot(self.Q @ x_diff, x_diff) + casadi.dot(self.R @ u_diff, u_diff)) / 2
+    x_diff = x - self.x_ref
+    u_diff = u - self.u_ref
+    cost = (casadi.dot(self.param['Q'] @ x_diff, x_diff) + casadi.dot(self.param['R'] @ u_diff, u_diff)) / 2
     return cost
 
   def compute_terminal_cost(self, x):
-    x_diff = x - self.sys.x_ref
-    cost = casadi.dot(self.Q_f @ x_diff, x_diff) / 2
+    x_diff = x - self.x_ref
+    cost = casadi.dot(self.param['Q_f'] @ x_diff, x_diff) / 2
     return cost
   
   def make_qp(self, X, U, J, G):
@@ -178,13 +186,14 @@ class MPC_Controller(Controller):
     else:
       update_func = self.make_RK4()
 
-    X = [casadi.SX.sym(f"x_{k}", self.sys.nx) for k in range(self.K+1)]
-    U = [casadi.SX.sym(f"u_{k}", self.sys.nu) for k in range(self.K)]
+    K = self.param['K']
+    X = [casadi.SX.sym(f"x_{k}", self.no) for k in range(K+1)]
+    U = [casadi.SX.sym(f"u_{k}", self.nu) for k in range(K)]
     G = []
 
     J = 0
-    for k in range(self.K):
-        J += self.compute_stage_cost(X[k], U[k]) * self.dt
+    for k in range(K):
+        J += self.compute_stage_cost(X[k], U[k]) * self.param['dt']
         eq = X[k+1] - update_func(x=X[k],u=U[k])["x_next"]
         G.append(eq)
     J += self.compute_terminal_cost(X[-1])
@@ -193,33 +202,38 @@ class MPC_Controller(Controller):
       self.make_qp(X, U, J, G)
     else:
       self.make_nlp(X, U, J, G)    
-    self.x0 = casadi.DM.zeros(self.sys.nx*(self.K+1)+self.sys.nu*self.K)
+    self.x0 = casadi.DM.zeros(self.no*(K+1)+self.nu*K)
 
   def compute_optimal_control(self, S):
-    K = self.K
-    x_init = self.sys.x.full().ravel().tolist()
-    lbx = x_init + self.x_lb.tolist()*K + self.u_lb.tolist()*K
-    ubx = x_init + self.x_ub.tolist()*K + self.u_ub.tolist()*K
-    lbg = [-1e-8]*self.sys.nx*K
-    ubg = [1e-8]*self.sys.nx*K
+    K = self.param['K']
+    _, x = self.get_data()
+    if x is None:
+      return
+    
+    x_init = x.full().ravel().tolist()
+    lbx = x_init + self.param['x_lb'].tolist()*K + self.param['u_lb'].tolist()*K
+    ubx = x_init + self.param['x_ub'].tolist()*K + self.param['u_ub'].tolist()*K
+    lbg = [-1e-8]*self.no*K
+    ubg = [1e-8]*self.no*K
 
     res = S(lbx=lbx,ubx=ubx,lbg=lbg,ubg=ubg,x0=self.x0)
 
-    offset = self.sys.nx*(K+1)
+    offset = self.no*(K+1)
     self.x0 = res["x"]
-    u_opt = self.x0[offset:offset+self.sys.nu]
+    u_opt = self.x0[offset:offset+self.nu]
     return u_opt
   
   def reshape_opt(self):
-    lenx = (self.K + 1) * self.sys.nx
-    x_opt = self.x0[:lenx].reshape((self.sys.nx, self.K + 1))
-    u_opt = self.x0[lenx:].reshape((self.sys.nu, self.K))
+    K = self.param['K']
+    lenx = (K + 1) * self.no
+    x_opt = self.x0[:lenx].reshape((self.no, K + 1))
+    u_opt = self.x0[lenx:].reshape((self.nu, K))
     return [x_opt, u_opt]
 
   def set_record(self, toggle = True):
     self.record_opt_history = toggle
 
-  def ctrl_out(self, dt):
+  def ctrl_out(self):
     u_opt = self.compute_optimal_control(self.S)
     if self.record_opt_history:
       self.opt_history.append(self.reshape_opt())
