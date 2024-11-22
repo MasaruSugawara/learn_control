@@ -1,3 +1,5 @@
 **/__pycache__/**
 *.gif
 .ipynb_checkpoints/*
+trash/*
+img/*
