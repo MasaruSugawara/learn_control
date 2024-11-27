@@ -68,12 +68,23 @@ class PID_Controller(Controller):
     self.param.setdefault('kp', casadi.DM.zeros(nu, no))
     self.param.setdefault('ki', casadi.DM.zeros(nu, no))
     self.param.setdefault('kd', casadi.DM.zeros(nu, no))
+    self.param.setdefault('u_lb', np.array([-np.inf]*nu))
+    self.param.setdefault('u_ub', np.array([np.inf]*nu))
     self.reset()
 
   def reset(self):
     self.error_sum = casadi.DM.zeros(self.no)
     self.last_state = None
     self.last_error = None
+
+  def set_pid(self, kp: np.array, ki: np.array, kd: np.array):
+    self.set_param('kp', kp)
+    self.set_param('ki', ki)
+    self.set_param('kd', kd)
+
+  def set_ctrl_range(self, u_lb: np.array, u_ub: np.array):
+    self.set_param('u_lb', u_lb)
+    self.set_param('u_ub', u_ub)
 
   def ctrl_out(self):
     d = self.get_data()
@@ -93,6 +104,7 @@ class PID_Controller(Controller):
 
       self.last_error = error
       self.last_state = d
+    u = casadi.fmax(casadi.fmin(u, self.param.get('u_ub')), self.param.get('u_lb'))
     return u
 
 # MPC requires system's equation and complete (estimated) information of state vector
@@ -116,17 +128,17 @@ class MPC_Controller(Controller):
   def set_model(self, f: casadi.Function):
     self.f = f
 
-  def set_horizon(self, horizon_len, period):
+  def set_horizon(self, horizon_len: int, period: float):
     self.param['K'] = horizon_len
     self.param['T'] = period
     self.param['dt'] = period / horizon_len
 
-  def set_cost(self, Q, R, Q_f):
+  def set_cost(self, Q: np.array, R: np.array, Q_f: np.array):
     self.param['Q'] = Q
     self.param['R'] = R
     self.param['Q_f'] = Q_f
 
-  def set_constraint(self, x_lb, x_ub, u_lb, u_ub):
+  def set_constraint(self, x_lb: np.array, x_ub: np.array, u_lb: np.array, u_ub: np.array):
     self.param['x_lb'] = x_lb
     self.param['x_ub'] = x_ub
     self.param['u_lb'] = u_lb

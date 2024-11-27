@@ -26,7 +26,7 @@ class Simulator:
     if u is not None:
       self.sys.update(u)
       t, x = sys_state
-      self.history.append((t, x.full(), u.full()))
+      self.history.append((t, x.full(), u))
       return True
     else:
       return False

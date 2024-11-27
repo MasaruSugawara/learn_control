@@ -1,5 +1,9 @@
 import casadi
 from abc import abstractmethod
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
+from typing import Callable
 
 class Dynamical_System:
   # Dimension of state vectors and control input
@@ -13,7 +17,8 @@ class Dynamical_System:
     self.dt = dt                        # step time 
     self.I = self.make_integrator(dt)   # integrator
     self.update_by_euler = False        # update the system by forward Euler method (for reduced computation time)
-    self.observer = lambda x: x         # observer of the state of the system
+    self.observer: Callable[[casadi.DM], casadi.DM] = lambda x: x # observer of the state of the system
+    self.history = []                   # history of system state
 
   # equation of system: x' = f(x, u)
   # where x is a state vector and u is control input.
@@ -22,15 +27,15 @@ class Dynamical_System:
   # x: state vector of dim nx and u: control input vector of dim nu
   # as arguments and returns nx-dimensional vector as time differential of state vector
   @abstractmethod
-  def make_f(self):
+  def make_f(self) -> casadi.Function:
     pass
 
   # set a state of the system
-  def set_init(self, x_init):
+  def set_init(self, x_init: np.array):
     self.x = casadi.DM(x_init)
 
   # advance the time of the dynamical system using ODE integrator
-  def make_integrator(self, dt: float):
+  def make_integrator(self, dt: float) -> casadi.Function:
     states = casadi.SX.sym("states", self.nx)
     ctrls = casadi.SX.sym("ctrls", self.nu)
     ode = self.f(x=states, u=ctrls)["x_dot"]
@@ -38,9 +43,17 @@ class Dynamical_System:
 
     I = casadi.integrator("I", "cvodes", dae, 0, dt)
     return I
-  
-  def set_time(self, t):
+
+  # wipe history data  
+  def clear_history(self):
+    self.history = []
+
+  # set system time
+  # if system time is changed, history should be cleared (but can be optout)
+  def set_time(self, t: float, clear_history = True):
     self.t = t
+    if clear_history:
+      self.clear_history()
   
   # change step time
   def set_dt(self, dt: float):
@@ -49,7 +62,8 @@ class Dynamical_System:
       self.I = self.make_integrator(dt)
 
   # advance the time of system by dt
-  def update(self, u):
+  def update(self, u: casadi.DM):
+    self.history.append((self.t, self.x.full()[:, 0], u.full()[:, 0]))
     if self.update_by_euler:
       self.x += self.dt * self.f(x=self.x, u=u)["x_dot"]
     else:
@@ -64,9 +78,33 @@ class Dynamical_System:
     self.f = self.make_f() # update the equation
 
   # observe system state
-  def observe(self):
+  def observe(self) -> tuple[float, casadi.DM]:
     return (self.t, self.observer(self.x))
+  
+  # plot system state (default)
+  def plot_state(self, ax: Axes):
+    hist = self.history
+    t_axis = [v[0] for v in hist]
+    t_axis.append(self.t)
+    cmap = plt.get_cmap('tab10')
+    for i in range(self.nx):
+      x_values = [v[1][i] for v in hist]
+      x_values.append(self.x.full()[i][0])
+      ax.plot(t_axis, x_values, label=f'x_{i}', color=cmap(i))
+      ax.scatter(self.t, self.x[i].full()[0], color=cmap(i))
 
+  # plot control history
+  def plot_control(self, ax: Axes):
+    hist = self.history
+    t_axis = [v[0] for v in hist]
+    cmap = plt.get_cmap('tab10')
+    for i in range(self.nu):
+      ax.plot(t_axis, [v[2][i] for v in hist], label=f'u_{i}', color=cmap(self.nx + i))
+
+  # plot the history of state and control simultaneously
+  def plot(self, ax: Axes):
+    self.plot_state(ax)
+    self.plot_control(ax)
 
 # Examples of dynamical systems
 
