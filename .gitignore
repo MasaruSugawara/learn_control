@@ -1,6 +1,8 @@
 **/__pycache__/**
 *.gif
-.ipynb_checkpoints/*
+**.ipynb_checkpoints/**
+**.egg-info/**
+build/*
 trash/*
 img/*
 test*

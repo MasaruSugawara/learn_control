@@ -4,8 +4,8 @@
 # https://github.com/proxima-technology/casadi_mpc_nyuumon.git
 
 import casadi
-from dynamical_system import *
-from controller import *
+from .dynamical_system import *
+from .controller import *
 
 class Simulator:
   def __init__(self, sys: Dynamical_System, ctrl: Controller):
