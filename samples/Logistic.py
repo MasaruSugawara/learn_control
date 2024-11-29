@@ -25,27 +25,33 @@ class Logistic_System(Dynamical_System):
 
 def test():
   a = 3.6
+  x_init = np.array([0.1])
+  x_ref = np.array([0.5])
+  u_ref = np.array([0.0])
+
   fig = plt.figure(figsize=(20, 8))
   fig.suptitle(f'Logistic system $x_{{n+1}} = {a} x_n(1-x_n) - u$')
-
+  
   sim = Simulator(Logistic_System(a=a), Const_Controller(1, 1))
-  sim.set_aim(np.array([0.1]), np.array([0.577]), np.array([0.0]))
+  sim.set_aim(x_init, x_ref, u_ref)
   sim.execute_until_stationary(100, 1.0, 10.0)
 
   ax = fig.add_subplot(1,3,1)
   ax.set_title('No control')
   sim.sys.plot(ax)
+  ax.grid(True)
   ax.legend()
 
   sim = Simulator(Logistic_System(a), PID_Controller(1, 1))
-  sim.ctrl.set_pid(np.array([[0.3]]), np.array([[0.0072]]), np.array([[1.0]]))
+  sim.ctrl.set_pid(np.array([[0.3]]), np.array([[0.0]]), np.array([[1.0]]))
   sim.ctrl.set_ctrl_range(np.array([0.0]), np.array([1.0]))
-  sim.set_aim(np.array([0.1]), np.array([0.577]), np.array([0.0]))
+  sim.set_aim(x_init, x_ref, u_ref)
   sim.execute_until_stationary(100, 1.0, 10.0)
   
   ax = fig.add_subplot(1,3,2)
   ax.set_title('PID control')
   sim.sys.plot(ax)
+  ax.grid(True)
   ax.legend()
   
   sim = Simulator(Logistic_System(a), MPC_Controller(1, 1))
@@ -53,13 +59,14 @@ def test():
   sim.ctrl.set_horizon(20, 20)
   sim.ctrl.set_cost(np.array([[1.0]]), np.array([[0.0]]), np.array([[1.0]]))
   sim.ctrl.set_constraint(np.array([0.0]), np.array([1.0]), np.array([0.0]), np.array([10.0]))
-  sim.set_aim(np.array([0.1]), np.array([0.577]), np.array([0.0]))
+  sim.set_aim(x_init, x_ref, u_ref)
   sim.ctrl.set_solver(is_euler = True)
   sim.execute_until_stationary(100, 1.0, 10.0)
   
   ax = fig.add_subplot(1,3,3)
   ax.set_title('MPC control')
   sim.sys.plot(ax)
+  ax.grid(True)
   ax.legend()
   plt.show()
 

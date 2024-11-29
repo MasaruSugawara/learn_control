@@ -2,6 +2,7 @@ import casadi
 from abc import abstractmethod
 import queue
 import numpy as np
+from typing import Callable
 
 class Controller:
   def __init__(self, no: int, nu:int, param: dict = {}, observer_queue_max = 0, discard_old_data = True):
@@ -70,6 +71,7 @@ class PID_Controller(Controller):
     self.param.setdefault('kd', casadi.DM.zeros(nu, no))
     self.param.setdefault('u_lb', np.array([-np.inf]*nu))
     self.param.setdefault('u_ub', np.array([np.inf]*nu))
+    self.f_err: Callable[[casadi.DM, casadi.DM], casadi.DM] = lambda x, x_ref: x_ref - x
     self.reset()
 
   def reset(self):
@@ -86,11 +88,14 @@ class PID_Controller(Controller):
     self.set_param('u_lb', u_lb)
     self.set_param('u_ub', u_ub)
 
+  def set_error_func(self, f: Callable[[casadi.DM, casadi.DM], casadi.DM]):
+    self.f_err = f
+
   def ctrl_out(self):
     d = self.get_data()
     if d is not None:
       t, x = d
-      error = self.x_ref - x
+      error = self.f_err(x, self.x_ref)
       u = self.param.get('kp') @ error
       if self.last_state is not None:
         last_t, _ = self.last_state

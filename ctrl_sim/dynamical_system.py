@@ -67,8 +67,7 @@ class Dynamical_System:
     if self.update_by_euler:
       self.x += self.dt * self.f(x=self.x, u=u)["x_dot"]
     else:
-      I = self.make_integrator(self.dt)
-      self.x = I(x0=self.x, p=u)["xf"]
+      self.x = self.I(x0=self.x, p=u)["xf"]
 
     self.t += self.dt
 
@@ -81,30 +80,38 @@ class Dynamical_System:
   def observe(self) -> tuple[float, casadi.DM]:
     return (self.t, self.observer(self.x))
   
+  def set_observer(self, obs: Callable[[casadi.DM], casadi.DM]):
+    self.observer = obs
+  
   # plot system state (default)
-  def plot_state(self, ax: Axes):
+  def plot_state(self, ax: Axes, idxlist=[]):
     hist = self.history
     t_axis = [v[0] for v in hist]
     t_axis.append(self.t)
     cmap = plt.get_cmap('tab10')
-    for i in range(self.nx):
+    if not idxlist:
+      idxlist = range(self.nx)
+
+    for i in idxlist:
       x_values = [v[1][i] for v in hist]
       x_values.append(self.x.full()[i][0])
       ax.plot(t_axis, x_values, label=f'x_{i}', color=cmap(i))
       ax.scatter(self.t, self.x[i].full()[0], color=cmap(i))
 
   # plot control history
-  def plot_control(self, ax: Axes):
+  def plot_control(self, ax: Axes, idxlist=[]):
     hist = self.history
     t_axis = [v[0] for v in hist]
     cmap = plt.get_cmap('tab10')
-    for i in range(self.nu):
+    if not idxlist:
+      idxlist = range(self.nu)
+    for i in idxlist:
       ax.plot(t_axis, [v[2][i] for v in hist], label=f'u_{i}', color=cmap(self.nx + i))
 
   # plot the history of state and control simultaneously
-  def plot(self, ax: Axes):
-    self.plot_state(ax)
-    self.plot_control(ax)
+  def plot(self, ax: Axes, state_idx=[], control_idx=[]):
+    self.plot_state(ax, state_idx)
+    self.plot_control(ax, control_idx)
 
 # Examples of dynamical systems
 
