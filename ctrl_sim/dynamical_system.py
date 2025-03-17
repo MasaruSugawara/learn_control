@@ -61,16 +61,22 @@ class Dynamical_System:
       self.dt = dt
       self.I = self.make_integrator(dt)
 
+  # compute the next state if control input u were applied
+  def next_state(self, u: casadi.DM):
+    if self.update_by_euler:
+      x_pred = self.x + self.dt * self.f(x=self.x, u=u)["x_dot"]
+    else:
+      x_pred = self.I(x0=self.x, p=u)["xf"]
+      
+    return x_pred
+  
   # advance the time of system by dt
   def update(self, u: casadi.DM):
     self.history.append((self.t, self.x.full()[:, 0], u.full()[:, 0]))
-    if self.update_by_euler:
-      self.x += self.dt * self.f(x=self.x, u=u)["x_dot"]
-    else:
-      self.x = self.I(x0=self.x, p=u)["xf"]
-
+    x_pred = self.next_state(u)
+    self.x = x_pred
     self.t += self.dt
-
+  
   # set parameters
   def set_param(self, param: dict):
     self.param = param
