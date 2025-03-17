@@ -5,6 +5,10 @@ import numpy as np
 from typing import Callable
 
 class Controller:
+  """ Controller class
+
+  please create great controller!
+  """
   def __init__(self, no: int, nu:int, param: dict = {}, observer_queue_max = 0, discard_old_data = True):
     self.no = no  # dimension of observable
     self.nu = nu  # dimension of control input

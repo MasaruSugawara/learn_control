@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-
-# This code is an arrangement of casadi_mpc_nyuumon:
-# https://github.com/proxima-technology/casadi_mpc_nyuumon.git
+""" ctrl_sim: Simulator
+This code is an arrangement of casadi_mpc_nyuumon:
+https://github.com/proxima-technology/casadi_mpc_nyuumon.git
+"""
 
 import casadi
 from .dynamical_system import *
@@ -16,10 +17,13 @@ class Simulator:
   def set_aim(self, x_init, x_ref, u_ref):
     self.sys.set_init(x_init)
     self.ctrl.set_ref(x_ref, u_ref)
-
-  # advance the system by the step time sys.dt
-  # return True if advanced, False if failed
+  
   def advance_dt(self):
+    """ advance the system by dt
+    advance the system by the step time sys.dt
+
+    return True if advanced, False if failed
+    """
     sys_state = self.sys.observe()
     self.ctrl.put_data(sys_state)
     u = self.ctrl.ctrl_out()
@@ -31,9 +35,12 @@ class Simulator:
     else:
       return False
   
-  # advance the system time by T as N steps
-  # return False if failed at some advancing step; otherwise return True
+  
   def execute(self, T: float, N: int):
+    """ execute the system by time T as N steps
+    advance the system time by T as N steps.
+    return False if failed at some advancing step; otherwise return True.
+    """
     if N <= 0:
       return False
     
@@ -44,9 +51,12 @@ class Simulator:
         return False
     return True
 
-  # execute until observable state vector remain stationary at target x_ref for exam_period
-  # return True if attained, False otherwise
+  
   def execute_until_stationary(self, maxT = 100, dt = 0.01, exam_period = 1.0, threshold = 0.01):
+    """ execute the system until the state of the sytem become stationaly.
+    execute until observable state vector remain stationary at target x_ref for exam_period.
+    return True if attained, False otherwise.
+    """
     attained_time = 0.0
     is_attained = False
     self.sys.set_time(0.0)
