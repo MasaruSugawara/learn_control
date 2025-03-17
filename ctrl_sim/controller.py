@@ -62,7 +62,7 @@ class Const_Controller(Controller):
     self.param.update('gain', casadi.DM(gain))
 
   def ctrl_out(self):
-    return self.param.get('gain')
+    return casadi.DM(self.param.get('gain'))
   
   def reset(self):
     pass
