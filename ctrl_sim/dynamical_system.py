@@ -173,7 +173,7 @@ class Inverted_Pendulum_System(Dynamical_System):
   def make_f(self):
     g = casadi.DM(9.81) # gravitational acceleration
 
-    # [x, x', theta, theta'] where x: position of box, 
+    # [x, theta, x', theta'] where x: position of box, 
     # theta: angle of pendulum; theta==0 when standing erect
     states = casadi.SX.sym("states", self.nx) 
     ctrls = casadi.SX.sym("ctrls", self.nu)   # force of pulling the box 
