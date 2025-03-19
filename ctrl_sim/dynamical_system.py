@@ -158,8 +158,8 @@ class Lotka_Volterra_System(Dynamical_System):
     p = self.param['p']; q = self.param['q'];
 
     # Lotka-Volterra equation with hunting (to control animal population)
-    x_dot = a*x   - b*x*y - p*u
-    y_dot = c*x*y - d*y   - q*u
+    x_dot = a*x   - b*x*y - p*u*x
+    y_dot = c*x*y - d*y   - q*u*y
 
     states_dot = casadi.vertcat(x_dot, y_dot)
     f = casadi.Function("f",[states,ctrls],[states_dot],['x','u'],['x_dot'])
