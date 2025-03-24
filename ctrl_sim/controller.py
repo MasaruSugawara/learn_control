@@ -59,7 +59,7 @@ class Const_Controller(Controller):
     self.param.setdefault('gain', casadi.DM.zeros(nu))
 
   def set_gain(self, gain: np.array):
-    self.param.update('gain', casadi.DM(gain))
+    self.set_param('gain', gain)
 
   def ctrl_out(self):
     return casadi.DM(self.param.get('gain'))
@@ -192,8 +192,8 @@ class MPC_Controller(Controller):
   def make_qp(self, X, U, J, G):
     qp = {"x":casadi.vertcat(*X,*U),"f":J,"g":casadi.vertcat(*G)}
     self.S = casadi.qpsol("S","osqp",qp, {
-      'error_on_fail': False,
-      'osqp': {'verbose': True}
+      'error_on_fail': True,
+      'osqp': {'verbose': False}
       })
     
   def make_nlp(self, X, U, J, G):
