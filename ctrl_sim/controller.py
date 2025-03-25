@@ -9,7 +9,7 @@ class Controller:
 
   please create great controller!
   """
-  def __init__(self, no: int, nu:int, param: dict = {}, observer_queue_max = 0, discard_old_data = True):
+  def __init__(self, no: int, nu:int, param: dict, observer_queue_max = 0, discard_old_data = True):
     self.no = no  # dimension of observable
     self.nu = nu  # dimension of control input
     if observer_queue_max >= 0:
@@ -54,8 +54,8 @@ class Controller:
     pass
 
 class Const_Controller(Controller):
-  def __init__(self, no: int, nu:int, param: dict = {}):
-    super().__init__(no, nu, param, observer_queue_max = -1)
+  def __init__(self, no: int, nu:int):
+    super().__init__(no, nu, {}, observer_queue_max = -1)
     self.param.setdefault('gain', casadi.DM.zeros(nu))
 
   def set_gain(self, gain: np.array):
@@ -68,8 +68,8 @@ class Const_Controller(Controller):
     pass
 
 class PID_Controller(Controller):
-  def __init__(self, no: int, nu:int, param: dict = {}):
-    super().__init__(no, nu, param, observer_queue_max = 1)
+  def __init__(self, no: int, nu:int):
+    super().__init__(no, nu, {}, observer_queue_max = 1)
     self.param.setdefault('kp', casadi.DM.zeros(nu, no))
     self.param.setdefault('ki', casadi.DM.zeros(nu, no))
     self.param.setdefault('kd', casadi.DM.zeros(nu, no))
@@ -119,8 +119,8 @@ class PID_Controller(Controller):
 # MPC requires system's equation and complete (estimated) information of state vector
 # i.e. no == nx
 class MPC_Controller(Controller):
-  def __init__(self, no: int, nu:int, param: dict = {}):
-    super().__init__(no, nu, param, observer_queue_max = 1)
+  def __init__(self, no: int, nu:int):
+    super().__init__(no, nu, {}, observer_queue_max = 1)
     self.param.setdefault('Q', casadi.diag([1.0]*no))
     self.param.setdefault('R', casadi.diag([1.0]*nu))
     self.param.setdefault('Q_f', casadi.diag([1.0]*no))
