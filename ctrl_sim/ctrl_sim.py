@@ -54,7 +54,8 @@ class Simulator:
     self.ctrl.put_data(sys_state)
     u = self.ctrl.ctrl_out()
     if u is not None:
-      self.sys.update(self.cpst.compensate(u))
+      u = self.cpst.compensate(u)
+      self.sys.update(u)
       t, x = sys_state
       self.history.append((t, x.full(), u.full()))
       return True
