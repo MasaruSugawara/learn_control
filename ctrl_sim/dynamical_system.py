@@ -5,6 +5,40 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from typing import Callable
 
+class Observer:
+  def __init__(self, no: int, nx:int, param: dict):
+    self.no = no
+    self.nx = nx
+    self.param = param
+
+  def observe(self, t: float, x: casadi.DM):
+    pass
+
+class Ideal_Observer(Observer):
+  def __init__(self, nx):
+    super().__init__(nx, nx, {})
+
+  def observe(self, t, x):
+    return x
+  
+class WhiteNoise_Observer(Observer):
+  def __init__(self, no, nx, sigma=1.0, seed=-1):
+    super().__init__(no, nx, {})
+    self.sigma = sigma
+    if seed >= 0:
+      self.rng = np.random.default_rng(seed)
+    else:
+      self.rng = np.random.default_rng()
+
+  def set_seed(self, s: int):
+    self.rng = np.random.default_rng(s)
+
+  def set_sigma(self, sigma: float):
+    self.sigma = sigma
+
+  def observe(self, t, x):
+    return x + casadi.DM(self.rng.normal(0.0, self.sigma, x.shape))
+  
 class Dynamical_System:
   # Dimension of state vectors and control input
   def __init__(self, nx: int, nu: int, param: dict, dt=0.1):
@@ -17,7 +51,7 @@ class Dynamical_System:
     self.dt = dt                        # step time 
     self.I = self.make_integrator(dt)   # integrator
     self.update_by_euler = False        # update the system by forward Euler method (for reduced computation time)
-    self.observer: Callable[[casadi.DM], casadi.DM] = lambda x: x # observer of the state of the system
+    self.observer = Ideal_Observer(nx) # observer of the state of the system
     self.history = []                   # history of system state
 
   # equation of system: x' = f(x, u)
@@ -84,9 +118,9 @@ class Dynamical_System:
 
   # observe system state
   def observe(self) -> tuple[float, casadi.DM]:
-    return (self.t, self.observer(self.x))
+    return (self.t, self.observer.observe(self.t, self.x))
   
-  def set_observer(self, obs: Callable[[casadi.DM], casadi.DM]):
+  def set_observer(self, obs: Observer):
     self.observer = obs
   
   # plot system state (default)
