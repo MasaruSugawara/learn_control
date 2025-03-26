@@ -22,9 +22,9 @@ class Ideal_Observer(Observer):
     return x
   
 class WhiteNoise_Observer(Observer):
-  def __init__(self, no, nx, sigma=1.0, seed=-1):
+  def __init__(self, no, nx, cov: np.ndarray, seed=-1):
     super().__init__(no, nx, {})
-    self.sigma = sigma
+    self.cov = cov
     if seed >= 0:
       self.rng = np.random.default_rng(seed)
     else:
@@ -37,7 +37,7 @@ class WhiteNoise_Observer(Observer):
     self.sigma = sigma
 
   def observe(self, t, x):
-    return x + casadi.DM(self.rng.normal(0.0, self.sigma, x.shape))
+    return x + casadi.DM(self.rng.multivariate_normal(np.zeros(x.shape[0]), self.cov))
   
 class Dynamical_System:
   # Dimension of state vectors and control input
